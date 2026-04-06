@@ -6,6 +6,7 @@ from typing import Optional, Union
 import numpy as np
 import ot as pot
 import torch
+from .prior import prior_ot_fn
 
 
 class OTPlanSampler:
@@ -20,6 +21,7 @@ class OTPlanSampler:
         normalize_cost: bool = False,
         num_threads: Union[int, str] = 1,
         warn: bool = True,
+        prior_method: str = "to_first",
     ) -> None:
         """Initialize the OTPlanSampler class.
 
@@ -53,6 +55,8 @@ class OTPlanSampler:
             self.ot_fn = partial(pot.unbalanced.sinkhorn_knopp_unbalanced, reg=reg, reg_m=reg_m)
         elif method == "partial":
             self.ot_fn = partial(pot.partial.entropic_partial_wasserstein, reg=reg)
+        elif method == "prior":
+            self.ot_fn = partial(prior_ot_fn, prior_method=prior_method)
         else:
             raise ValueError(f"Unknown method: {method}")
         self.reg = reg

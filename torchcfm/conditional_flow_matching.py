@@ -226,7 +226,7 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
     It overrides the sample_location_and_conditional_flow.
     """
 
-    def __init__(self, sigma: Union[float, int] = 0.0):
+    def __init__(self, sigma: Union[float, int] = 0.0, method="exact", prior_method="to_first"):
         r"""Initialize the ConditionalFlowMatcher class.
 
         It requires the hyper-parameter $\sigma$.
@@ -236,7 +236,7 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
                 ot_sampler: exact OT method to draw couplings (x0, x1) (see Eq.(17) [1]).
         """
         super().__init__(sigma)
-        self.ot_sampler = OTPlanSampler(method="exact")
+        self.ot_sampler = OTPlanSampler(method=method, prior_method=prior_method)
 
     def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
         r"""
