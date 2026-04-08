@@ -26,11 +26,12 @@ def prior_ot_fn(
     if prior_method == 'to_first':
         Q = to_first_ot_plan(a, b)
     
-    #Ensure no zero entries in Q to avoid log(0) issues, and normalize Q to be a valid probability distribution.
+    #Ensure no zero entries in Q to avoid log(0) issues.
     eps = 1e-8
     Q = np.maximum(Q, eps)
+    #Note: I am unsure if this is necssary, but it ensures that Q is a valid probability distribution.
     Q = Q / Q.sum()
-    
+
     M_adjusted = M - reg * np.log(Q)
 
     #raise ValueError(f'Prior method {prior_method} not implemented')
@@ -46,5 +47,9 @@ def to_first_ot_plan(a, b):
     return Q
 
 def basic_entropic_ot_plan(a, b):
+    '''
+    OT method which should be equivalent to the standard entropic OT plan without any prior information.
+    Qe = a ⊗ b, is the outer product of a and b. 
+    '''
     Q = np.outer(a,b)
     return Q
