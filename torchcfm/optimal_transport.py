@@ -56,7 +56,7 @@ class OTPlanSampler:
         elif method == "partial":
             self.ot_fn = partial(pot.partial.entropic_partial_wasserstein, reg=reg)
         elif method == "prior":
-            self.ot_fn = partial(prior_ot_fn, prior_method=prior_method)
+            self.ot_fn = partial(prior_ot_fn, prior_method=prior_method, reg=reg)
         else:
             raise ValueError(f"Unknown method: {method}")
         self.reg = reg

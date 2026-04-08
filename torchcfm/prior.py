@@ -5,7 +5,7 @@ def prior_ot_fn(
     a,
     b,
     M,
-    reg,
+    reg=0.1,
     prior_method='to_first'
 ):
     '''
@@ -27,15 +27,16 @@ def prior_ot_fn(
         Q = to_first_ot_plan(a, b)
     
     #Ensure no zero entries in Q to avoid log(0) issues.
-    eps = 1e-8
-    Q = np.maximum(Q, eps)
-    #Note: I am unsure if this is necssary, but it ensures that Q is a valid probability distribution.
-    Q = Q / Q.sum()
+    Q = clip_matrix(Q)
 
     M_adjusted = M - reg * np.log(Q)
+    M_adjusted = clip_matrix(M_adjusted)
 
+    P =  pot.sinkhorn(a, b, M_adjusted, reg=reg)
+    P = clip_matrix(P)
     #raise ValueError(f'Prior method {prior_method} not implemented')
-    return pot.sinkhorn(a, b, M_adjusted, reg=reg)
+    return P
+
 
 def to_first_ot_plan(a, b):
     '''
@@ -53,3 +54,12 @@ def basic_entropic_ot_plan(a, b):
     '''
     Q = np.outer(a,b)
     return Q
+
+def clip_matrix(M, eps=1e-8):
+    '''
+    Clip the cost matrix M to ensure numerical stability.
+    This is important to avoid issues with log(0) when adjusting the cost matrix with the prior.
+    '''
+    M_clipped = np.maximum(M, eps)
+    M_normalized = M_clipped / np.sum(M_clipped)
+    return M_normalized
