@@ -238,7 +238,7 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         super().__init__(sigma)
         self.ot_sampler = OTPlanSampler(method=method, prior_method=prior_method)
 
-    def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
+    def sample_location_and_conditional_flow(self, x0, x1, t=None, D=None, return_noise=False):
         r"""
         Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
         and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
@@ -268,7 +268,7 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         ----------
         [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
         """
-        x0, x1 = self.ot_sampler.sample_plan(x0, x1)
+        x0, x1 = self.ot_sampler.sample_plan(x0, x1, D=D)
         return super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
 
     def guided_sample_location_and_conditional_flow(
