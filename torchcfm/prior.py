@@ -8,7 +8,11 @@ def prior_ot_fn(
     M,
     reg=0.1,
     prior_method='to_first',
-    D=None
+    D=None,
+    x0=None,
+    x1=None,
+    y0=None,
+    y1=None,
 ):
     '''
     Implement a prior-based optimal transport method. This is a placeholder
@@ -20,6 +24,9 @@ def prior_ot_fn(
     Use this: https://pythonot.github.io/_modules/ot/lp/_network_simplex.html#emd as an example.
 
     These should be taking as argument and outputting numpy arrays.
+
+    Then, we have x0, x1 being the original data matrices for the two time points,
+    and D being the spatial distance matrix between the cells in x0 and x1.
     '''
     Q = np.zeros((a.shape[0], b.shape[0])) 
     # Prior cost matrix, which can be used to encode the prior information about the transport plan.
@@ -30,8 +37,14 @@ def prior_ot_fn(
     elif prior_method == 'spatial':
         #To do : add safeguard for nonetype for D
         Q = get_spatial_prior(D)
+    elif prior_method == 'pseudotime_uniform':
+        if y0 is None or y1 is None:
+            raise ValueError(
+                "pseudotime_uniform prior requires precomputed y0 and y1 labels."
+            )
+        Q = get_pseudotime_prior_uniform(y0, y1)
     else:
-        print("Prior method not implemented yet")
+        raise ValueError(f"Unknown prior method: {prior_method}")
     
     #Ensure no zero entries in Q to avoid log(0) issues.
     Q = clip_matrix(Q)
@@ -41,7 +54,6 @@ def prior_ot_fn(
 
     P =  pot.sinkhorn(a, b, M_adjusted, reg=reg)
     P = clip_matrix(P)
-    #raise ValueError(f'Prior method {prior_method} not implemented')
     return P
 
 
@@ -81,3 +93,45 @@ def clip_matrix(M, eps=1e-8):
     M_clipped = np.maximum(M, eps)
     M_normalized = M_clipped / np.sum(M_clipped)
     return M_normalized
+
+
+################################################## PSEUDOTIME PRIOR METHODS ##################################################
+
+
+def get_pseudotime_prior_uniform(y0, y1, threshold=0.2):
+    '''
+    Based on the pseudotimes y0 and y1, compute the prior cost matrix Q for the OT plan.
+
+    The initial idea is to create a prior matrix that has some initial minimum threshold
+    which will be threshold / total_cells. Then, we calculate the uniform distribution
+    over the other pseudotimes which are above, getting threshold / total_cells + (1 - (threshold / total_cells)) / (pseudotime_over_cells)
+
+    We repeat this for every single cell in y0, and we get the final Q matrix which is of size (n0, n1) where n0 is the number of cells in y0 and n1 is the number of cells in y1.
+    '''
+
+    n0 = y0.shape[0]
+    n1 = y1.shape[0]
+    if n0 == 0 or n1 == 0:
+        raise ValueError("y0 and y1 must each contain at least one pseudotime value.")
+
+    y0_t = y0.detach().to(dtype=torch.float32)
+    y1_t = y1.detach().to(device=y0_t.device, dtype=torch.float32)
+
+    # Boolean mask of admissible pairs (cell in y1 occurs after cell in y0).
+    pseudotime_greater_f = (y1_t.unsqueeze(0) > y0_t.unsqueeze(1)).to(dtype=torch.float32)
+
+    # Row-wise counts via GEMM (BLAS-backed matmul).
+    ones = torch.ones((n1, 1), device=y0_t.device, dtype=torch.float32)
+    counts = pseudotime_greater_f @ ones
+    counts_safe = torch.clamp(counts, min=1.0)
+
+    threshold_value = float(threshold) / float(n1)
+    extra_mass = (1.0 - threshold_value) / counts_safe  # shape: (n0, 1)
+
+    Q = torch.full((n0, n1), threshold_value, device=y0_t.device, dtype=torch.float32)
+    Q = Q + pseudotime_greater_f * extra_mass
+
+    # renormalize each row of Q to ensure it sums to 1
+    Q_sum = Q.sum(dim=1, keepdim=True)
+    Q_normalized = Q / Q_sum
+    return Q_normalized.cpu().numpy()
