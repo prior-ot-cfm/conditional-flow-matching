@@ -1,6 +1,7 @@
 import numpy as np
 import ot as pot
 import torch
+import scipy as sp
 
 def prior_ot_fn(
     a,
@@ -43,6 +44,18 @@ def prior_ot_fn(
                 "pseudotime_uniform prior requires precomputed y0 and y1 labels."
             )
         Q = get_pseudotime_prior_uniform(y0, y1)
+    elif prior_method == 'pseudotime_gaussian':
+        if y0 is None or y1 is None:
+            raise ValueError(
+                "pseudotime_gaussian prior requires precomputed y0 and y1 labels."
+            )
+        Q = get_pseudotime_prior_gaussian(y0, y1)
+    elif prior_method == 'pseudotime_gamma':
+        if y0 is None or y1 is None:
+            raise ValueError(
+                "pseudotime_gamma prior requires precomputed y0 and y1 labels."
+            )
+        Q = get_pseudotime_prior_gamma(y0, y1)
     else:
         raise ValueError(f"Unknown prior method: {prior_method}")
     
@@ -130,6 +143,53 @@ def get_pseudotime_prior_uniform(y0, y1, threshold=0.2):
 
     Q = torch.full((n0, n1), threshold_value, device=y0_t.device, dtype=torch.float32)
     Q = Q + pseudotime_greater_f * extra_mass
+
+    # renormalize each row of Q to ensure it sums to 1
+    Q_sum = Q.sum(dim=1, keepdim=True)
+    Q_normalized = Q / Q_sum
+    return Q_normalized.cpu().numpy()
+
+def get_pseudotime_prior_gaussian(y0, y1, sigma=0.1):
+    '''
+    Alternative pseudotime prior method where we use a Gaussian kernel based on the difference in pseudotime values.
+    Q[i, j] = exp(- (y1[j] - (y0[i] + mu))^2 / (2 * sigma^2))
+    where the mu is the expected time shift in pseudotime.
+    
+    We calculate mu as the shift between the time distributions, calculated using
+    the Wasserstein distance between the two pseudotime distributions.
+    '''
+    y0_t = y0.detach().to(dtype=torch.float32)
+    y1_t = y1.detach().to(device=y0_t.device, dtype=torch.float32)
+
+    mu = sp.stats.wasserstein_distance(y0_t.cpu().numpy(), y1_t.cpu().numpy())
+
+    diff = y1_t.unsqueeze(0) - (y0_t.unsqueeze(1) + mu)
+    Q = torch.exp(- (diff ** 2) / (2 * sigma ** 2))
+
+    # add a small constant to ensure no zero entries in Q to avoid log(0) issues
+    Q = Q + 1e-8
+
+    # renormalize each row of Q to ensure it sums to 1
+    Q_sum = Q.sum(dim=1, keepdim=True)
+    Q_normalized = Q / Q_sum
+    return Q_normalized.cpu().numpy()
+
+def get_pseudotime_prior_gamma(y0, y1, shape=2.0, scale=1.0):
+    '''
+    Alternative pseudotime prior method where we use a Gamma distribution based on the difference in pseudotime values.
+    Q[i, j] = gamma.pdf(y1[j] - y0[i], a=shape, scale=scale)
+    where the shape and scale parameters can be tuned to control the skewness and spread of the distribution.
+    '''
+    y0_t = y0.detach().to(dtype=torch.float32)
+    y1_t = y1.detach().to(device=y0_t.device, dtype=torch.float32)
+
+    mu = sp.stats.wasserstein_distance(y0_t.cpu().numpy(), y1_t.cpu().numpy())
+
+    diff = y1_t.unsqueeze(0) - (y0_t.unsqueeze(1) + mu)
+    Q = torch.from_numpy(sp.stats.gamma.pdf(diff.cpu().numpy(), a=shape, scale=scale)).to(device=y0_t.device)
+
+    # add a small constant to ensure no zero entries in Q to avoid log(0) issues
+    Q = Q + 1e-8
 
     # renormalize each row of Q to ensure it sums to 1
     Q_sum = Q.sum(dim=1, keepdim=True)
