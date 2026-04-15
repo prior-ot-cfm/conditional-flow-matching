@@ -162,6 +162,7 @@ def get_pseudotime_prior_gaussian(y0, y1, sigma=0.1):
     y1_t = y1.detach().to(device=y0_t.device, dtype=torch.float32)
 
     mu = sp.stats.wasserstein_distance(y0_t.cpu().numpy(), y1_t.cpu().numpy())
+    sigma = sigma * mu # Scale sigma by the Wasserstein distance to adapt to the scale of the pseudotime distributions
 
     diff = y1_t.unsqueeze(0) - (y0_t.unsqueeze(1) + mu)
     Q = torch.exp(- (diff ** 2) / (2 * sigma ** 2))
