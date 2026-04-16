@@ -10,6 +10,8 @@ def prior_ot_fn(
     reg=0.1,
     prior_method='to_first',
     D=None,
+    x0=None,
+    x1=None,
     y0=None,
     y1=None,
 ):
