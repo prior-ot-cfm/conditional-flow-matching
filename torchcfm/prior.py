@@ -8,7 +8,9 @@ def prior_ot_fn(
     M,
     reg=0.1,
     prior_method='to_first',
-    D=None
+    D=None,
+    y0=None,
+    y1=None,
 ):
     '''
     Implement a prior-based optimal transport method. This is a placeholder
@@ -30,6 +32,8 @@ def prior_ot_fn(
     elif prior_method == 'spatial':
         #To do : add safeguard for nonetype for D
         Q = get_spatial_prior(D)
+    elif prior_method == 'pseudotime_sigmoid':
+        Q = get_pseudotime_sigmoid_prior(y0, y1)
     else:
         print("Prior method not implemented yet")
     
@@ -71,6 +75,29 @@ def get_spatial_prior(D):
     sigma = np.median(D) # Why median here? - e^-median$2/2median^2 is not too small , gpt suggestion though, look into proper sources
     Q = np.exp(- (D ** 2) / (2 * sigma ** 2))
     return Q
+
+def get_pseudotime_sigmoid_prior(y0, y1, eps=1e-8, alpha=10.0):
+    '''
+    Build a soft directional prior from source and target pseudotimes using a sigmoid
+    over the pairwise pseudotime gap Delta_ij = t_tgt[j] - t_src[i].
+    '''
+    n0 = y0.shape[0]
+    n1 = y1.shape[0]
+
+    y0_t = y0.detach().to(dtype=torch.float32)
+    y1_t = y1.detach().to(device=y0_t.device, dtype=torch.float32)
+
+    diff = y1_t.unsqueeze(0) - y0_t.unsqueeze(1)
+    forward_mask = diff >= 0
+
+    Q = torch.full((n0, n1), eps, device=y0_t.device, dtype=torch.float32)
+    Q_forward = eps + (1.0 - eps) * torch.sigmoid(alpha * diff)
+    Q = torch.where(forward_mask, Q_forward, Q)
+
+    # renormalize each row of Q to ensure it sums to 1
+    Q_sum = Q.sum(dim=1, keepdim=True)
+    Q_normalized = Q / Q_sum
+    return Q_normalized.cpu().numpy()
 
     
 def clip_matrix(M, eps=1e-8):
