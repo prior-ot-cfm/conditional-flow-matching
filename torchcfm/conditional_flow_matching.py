@@ -226,7 +226,7 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
     It overrides the sample_location_and_conditional_flow.
     """
 
-    def __init__(self, sigma: Union[float, int] = 0.0, method="exact", prior_method="to_first"):
+    def __init__(self, sigma: Union[float, int] = 0.0, method="exact", prior_method="to_first", reg=0.1):
         r"""Initialize the ConditionalFlowMatcher class.
 
         It requires the hyper-parameter $\sigma$.
@@ -236,9 +236,11 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
                 ot_sampler: exact OT method to draw couplings (x0, x1) (see Eq.(17) [1]).
         """
         super().__init__(sigma)
-        self.ot_sampler = OTPlanSampler(method=method, prior_method=prior_method)
+        self.ot_sampler = OTPlanSampler(method=method, prior_method=prior_method, reg=reg)
 
-    def sample_location_and_conditional_flow(self, x0, x1, t=None, D=None, return_noise=False):
+    def sample_location_and_conditional_flow(
+        self, x0, x1, y0=None, y1=None, t=None, D=None, return_noise=False
+    ):
         r"""
         Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
         and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
@@ -268,8 +270,10 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         ----------
         [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
         """
-        x0, x1 = self.ot_sampler.sample_plan(x0, x1, D=D)
-        return super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+        x0, x1 = self.ot_sampler.sample_plan(x0, x1, D=D, y0=y0, y1=y1)
+        return super().sample_location_and_conditional_flow(
+            x0, x1, t=t, return_noise=return_noise
+        )
 
     def guided_sample_location_and_conditional_flow(
         self, x0, x1, y0=None, y1=None, t=None, return_noise=False
@@ -309,10 +313,14 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         """
         x0, x1, y0, y1 = self.ot_sampler.sample_plan_with_labels(x0, x1, y0, y1)
         if return_noise:
-            t, xt, ut, eps = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+            t, xt, ut, eps = super().sample_location_and_conditional_flow(
+                x0, x1, y0=y0, y1=y1, t=t, return_noise=return_noise
+            )
             return t, xt, ut, y0, y1, eps
         else:
-            t, xt, ut = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+            t, xt, ut = super().sample_location_and_conditional_flow(
+                x0, x1, y0=y0, y1=y1, t=t, return_noise=return_noise
+            )
             return t, xt, ut, y0, y1
 
 
