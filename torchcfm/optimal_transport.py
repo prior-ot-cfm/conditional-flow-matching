@@ -103,8 +103,8 @@ class OTPlanSampler:
         if not np.all(np.isfinite(p)):
             print("ERROR: p is not finite")
             print(p)
-            print("Cost mean, max", M.mean(), M.max())
             print(x0, x1)
+            print("Cost mean, max", M.mean(), M.max())
         if np.abs(p.sum()) < 1e-8:
             if self.warn:
                 warnings.warn("Numerical errors in OT plan, reverting to uniform plan.")
@@ -156,6 +156,8 @@ class OTPlanSampler:
             represents the source minibatch drawn from $\pi$
         """
         pi = self.get_map(x0, x1, D=D, y0=y0, y1=y1)
+       # if np.any(np.isnan(pi)):
+        #    print("Warning: NaNs detected in transport map 'pi'!")
         i, j = self.sample_map(pi, x0.shape[0], replace=replace)
         return x0[i], x1[j]
 

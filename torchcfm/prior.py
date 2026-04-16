@@ -61,12 +61,15 @@ def prior_ot_fn(
     
     #Ensure no zero entries in Q to avoid log(0) issues.
     Q = clip_matrix(Q)
-
+    if(np.any(Q <= 0)):
+        raise ValueError("Warning: Regularization matrix 'Q' contains zero or negative entries after clipping; this indicates a malformed Q")
     M_adjusted = M - reg * np.log(Q)
     M_adjusted = clip_matrix(M_adjusted)
 
     P =  pot.sinkhorn(a, b, M_adjusted, reg=reg)
     P = clip_matrix(P)
+    if(not np.all(np.isfinite(P))):
+        raise ValueError("Warning: Infinity detected in transport plan 'P' after Sinkhorn!")
     return P
 
 
@@ -93,8 +96,11 @@ def get_spatial_prior(D):
     computes matrix Q given spatial matrix - gaussian kernel
     e^-D^2/2sigma
     '''
-    sigma = np.median(D) # Why median here? - e^-median$2/2median^2 is not too small , gpt suggestion though, look into proper sources
-    Q = np.exp(- (D ** 2) / (2 * sigma ** 2))
+    D = D.cpu().numpy() 
+    if D is None:
+        raise ValueError("Spatial prior method requires a distance matrix D.")
+   # sigma = np.median(D) # Why median here? - e^-median$2/2median^2 is not too small , gpt suggestion though, look into proper sources
+    Q = np.exp(- (D ** 2) / (2))
     return Q
 
     
