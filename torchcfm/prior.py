@@ -14,6 +14,9 @@ def prior_ot_fn(
     x1=None,
     y0=None,
     y1=None,
+    p0=None,
+    p1=None,
+    profile_sigma=None,
 ):
     '''
     Implement a prior-based optimal transport method. This is a placeholder
@@ -38,6 +41,12 @@ def prior_ot_fn(
     elif prior_method == 'spatial':
         #To do : add safeguard for nonetype for D
         Q = get_spatial_prior(D)
+    elif prior_method == 'spatial_knn_expression':
+        if p0 is None or p1 is None:
+            raise ValueError(
+                "spatial_knn_expression prior requires sampled neighborhood profiles p0 and p1."
+            )
+        Q = get_spatial_knn_expression_prior(p0, p1, sigma=profile_sigma)
     elif prior_method == 'pseudotime_sigmoid':
         Q = get_pseudotime_sigmoid_prior(y0, y1)
     elif prior_method == 'pseudotime_uniform':
@@ -98,6 +107,34 @@ def get_spatial_prior(D):
     sigma = np.median(D) # Why median here? - e^-median$2/2median^2 is not too small , gpt suggestion though, look into proper sources
     Q = np.exp(- (D ** 2) / (2 * sigma ** 2))
     return Q
+
+
+def get_spatial_knn_expression_prior(p0, p1, sigma=None, eps=1e-8):
+    '''
+    Build a prior from pairwise Euclidean distances between sampled
+    precomputed neighborhood-expression profiles.
+    '''
+    if isinstance(p0, torch.Tensor):
+        p0_np = p0.detach().cpu().numpy()
+    else:
+        p0_np = np.asarray(p0, dtype=np.float32)
+
+    if isinstance(p1, torch.Tensor):
+        p1_np = p1.detach().cpu().numpy()
+    else:
+        p1_np = np.asarray(p1, dtype=np.float32)
+
+    diff = p0_np[:, None, :] - p1_np[None, :, :]
+    dist = np.linalg.norm(diff, axis=-1)
+
+    if sigma is None:
+        sigma = float(np.median(dist))
+    sigma = max(float(sigma), eps)
+
+    Q = np.exp(-((dist ** 2) / (2.0 * sigma ** 2))) + eps
+    row_sums = Q.sum(axis=1, keepdims=True)
+    row_sums = np.maximum(row_sums, eps)
+    return Q / row_sums
 
 def get_pseudotime_sigmoid_prior(y0, y1, eps=1e-8, alpha=10.0):
     '''

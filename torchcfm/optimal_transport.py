@@ -22,6 +22,7 @@ class OTPlanSampler:
         num_threads: Union[int, str] = 1,
         warn: bool = True,
         prior_method: str = "to_first",
+        profile_sigma: Optional[float] = None,
     ) -> None:
         """Initialize the OTPlanSampler class.
 
@@ -56,7 +57,12 @@ class OTPlanSampler:
         elif method == "partial":
             self.ot_fn = partial(pot.partial.entropic_partial_wasserstein, reg=reg)
         elif method == "prior":
-            self.ot_fn = partial(prior_ot_fn, prior_method=prior_method, reg=reg)
+            self.ot_fn = partial(
+                prior_ot_fn,
+                prior_method=prior_method,
+                reg=reg,
+                profile_sigma=profile_sigma,
+            )
         else:
             raise ValueError(f"Unknown method: {method}")
         self.reg = reg
@@ -64,7 +70,7 @@ class OTPlanSampler:
         self.normalize_cost = normalize_cost
         self.warn = warn
 
-    def get_map(self, x0, x1, D=None, y0=None, y1=None):
+    def get_map(self, x0, x1, D=None, y0=None, y1=None, p0=None, p1=None):
         """Compute the OT plan (wrt squared Euclidean cost) between a source and a target
         minibatch.
 
@@ -98,6 +104,8 @@ class OTPlanSampler:
             x1=x1,
             y0=y0,
             y1=y1,
+            p0=p0,
+            p1=p1,
         )
 
         if not np.all(np.isfinite(p)):
@@ -135,7 +143,7 @@ class OTPlanSampler:
         )
         return np.divmod(choices, pi.shape[1])
 
-    def sample_plan(self, x0, x1, D=None, y0=None, y1=None, replace=True):
+    def sample_plan(self, x0, x1, D=None, y0=None, y1=None, p0=None, p1=None, replace=True):
         r"""Compute the OT plan $\pi$ (wrt squared Euclidean cost) between a source and a target
         minibatch and draw source and target samples from pi $(x,z) \sim \pi$
 
@@ -155,7 +163,7 @@ class OTPlanSampler:
         x1[j] : Tensor, shape (bs, *dim)
             represents the source minibatch drawn from $\pi$
         """
-        pi = self.get_map(x0, x1, D=D, y0=y0, y1=y1)
+        pi = self.get_map(x0, x1, D=D, y0=y0, y1=y1, p0=p0, p1=p1)
         i, j = self.sample_map(pi, x0.shape[0], replace=replace)
         return x0[i], x1[j]
 

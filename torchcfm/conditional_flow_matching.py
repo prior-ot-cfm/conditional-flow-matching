@@ -226,7 +226,14 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
     It overrides the sample_location_and_conditional_flow.
     """
 
-    def __init__(self, sigma: Union[float, int] = 0.0, method="exact", prior_method="to_first", reg=0.1):
+    def __init__(
+        self,
+        sigma: Union[float, int] = 0.0,
+        method="exact",
+        prior_method="to_first",
+        reg=0.1,
+        profile_sigma=None,
+    ):
         r"""Initialize the ConditionalFlowMatcher class.
 
         It requires the hyper-parameter $\sigma$.
@@ -236,10 +243,24 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
                 ot_sampler: exact OT method to draw couplings (x0, x1) (see Eq.(17) [1]).
         """
         super().__init__(sigma)
-        self.ot_sampler = OTPlanSampler(method=method, prior_method=prior_method, reg=reg)
+        self.ot_sampler = OTPlanSampler(
+            method=method,
+            prior_method=prior_method,
+            reg=reg,
+            profile_sigma=profile_sigma,
+        )
 
     def sample_location_and_conditional_flow(
-        self, x0, x1, y0=None, y1=None, t=None, D=None, return_noise=False
+        self,
+        x0,
+        x1,
+        y0=None,
+        y1=None,
+        p0=None,
+        p1=None,
+        t=None,
+        D=None,
+        return_noise=False,
     ):
         r"""
         Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
@@ -270,7 +291,9 @@ class ExactOptimalTransportConditionalFlowMatcher(ConditionalFlowMatcher):
         ----------
         [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
         """
-        x0, x1 = self.ot_sampler.sample_plan(x0, x1, D=D, y0=y0, y1=y1)
+        x0, x1 = self.ot_sampler.sample_plan(
+            x0, x1, D=D, y0=y0, y1=y1, p0=p0, p1=p1
+        )
         return super().sample_location_and_conditional_flow(
             x0, x1, t=t, return_noise=return_noise
         )
