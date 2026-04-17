@@ -14,6 +14,7 @@ def prior_ot_fn(
     x1=None,
     y0=None,
     y1=None,
+    combined_spatial_pseudotime_gaussian_alpha=0.5
 ):
     '''
     Implement a prior-based optimal transport method. This is a placeholder
@@ -36,7 +37,8 @@ def prior_ot_fn(
     elif prior_method == 'to_first':
         Q = to_first_ot_plan(a, b)
     elif prior_method == 'spatial':
-        #To do : add safeguard for nonetype for D
+        if D is None:
+            raise ValueError("Spatial prior method requires a distance matrix D.")
         Q = get_spatial_prior(D)
     elif prior_method == 'pseudotime_uniform':
         if y0 is None or y1 is None:
@@ -56,6 +58,16 @@ def prior_ot_fn(
                 "pseudotime_gamma prior requires precomputed y0 and y1 labels."
             )
         Q = get_pseudotime_prior_gamma(y0, y1)
+    elif prior_method == 'combined_spatial_pseudotime_gaussian':
+        if D is None:
+            raise ValueError("Spatial prior method requires a distance matrix D.")
+        if y0 is None or y1 is None:
+            raise ValueError(
+                "combined_spatial_pseudotime_gaussian prior requires precomputed y0 and y1 labels."
+            )
+        Q_spatial = get_spatial_prior(D)
+        Q_pseudotime = get_pseudotime_prior_gaussian(y0, y1)
+        Q = (1 - combined_spatial_pseudotime_gaussian_alpha) * Q_spatial + combined_spatial_pseudotime_gaussian_alpha * Q_pseudotime
     else:
         raise ValueError(f"Unknown prior method: {prior_method}")
     
