@@ -59,6 +59,8 @@ class OTPlanSampler:
             self.ot_fn = partial(prior_ot_fn, prior_method=prior_method, reg=reg)
         else:
             raise ValueError(f"Unknown method: {method}")
+        
+        self.method = method
         self.reg = reg
         self.reg_m = reg_m
         self.normalize_cost = normalize_cost
@@ -89,16 +91,19 @@ class OTPlanSampler:
         if self.normalize_cost:
             M = M / M.max()  # should not be normalized when using minibatches
         
-        p = self.ot_fn(
-            a,
-            b,
-            M.detach().cpu().numpy(),
-            D=D,
-            x0=x0,
-            x1=x1,
-            y0=y0,
-            y1=y1,
-        )
+        if self.method == "prior":
+            p = self.ot_fn(
+                a,
+                b,
+                M.detach().cpu().numpy(),
+                D=D,
+                x0=x0,
+                x1=x1,
+                y0=y0,
+                y1=y1,
+            )
+        else:
+            p = self.ot_fn(a, b, M.detach().cpu().numpy())
 
         if not np.all(np.isfinite(p)):
             print("ERROR: p is not finite")

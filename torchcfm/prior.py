@@ -59,7 +59,7 @@ def prior_ot_fn(
     else:
         raise ValueError(f"Unknown prior method: {prior_method}")
     
-    #Ensure no zero entries in Q to avoid log(0) issues.
+    # Ensure no zero entries in Q to avoid log(0) issues.
     Q = clip_matrix(Q)
 
     M_adjusted = M - reg * np.log(Q)
