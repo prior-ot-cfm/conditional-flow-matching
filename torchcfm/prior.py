@@ -3,6 +3,8 @@ import ot as pot
 import torch
 import scipy as sp
 
+DEBUG=False
+
 def prior_ot_fn(
     a,
     b,
@@ -62,11 +64,49 @@ def prior_ot_fn(
     # Ensure no zero entries in Q to avoid log(0) issues.
     Q = clip_matrix(Q)
 
-    M_adjusted = M - reg * np.log(Q)
+    # now show a heatmap of the prior cost matrix Q
+    if DEBUG:
+        import matplotlib.pyplot as plt
+        plt.clf()
+        plt.imshow(Q, cmap='hot', interpolation='nearest')
+        plt.colorbar()
+        plt.title(f"Prior Cost Matrix Q - {prior_method}")
+        plt.savefig(f"prior_cost_matrix_{prior_method}.png")
+
+        # let's plot the cost matrix M as well
+        # reset the color bar
+        plt.clf()
+        plt.imshow(M, cmap='hot', interpolation='nearest')
+        plt.colorbar()
+        plt.title(f"Cost Matrix M - {prior_method}")
+        plt.savefig(f"cost_matrix_{prior_method}.png")
+
+    # M_adjusted = M - reg * np.log(Q)
+    # first scale M to be between 0 and 1, then apply the log adjustment
+    M = M / np.max(M)
+    M = clip_matrix(M)
+    M_adjusted = (1 - reg) * np.log(M) - reg * np.log(Q)
     M_adjusted = clip_matrix(M_adjusted)
+
+    if DEBUG:
+        # plot the adjusted cost matrix M_adjusted as well
+        plt.clf()
+        plt.imshow(M_adjusted, cmap='hot', interpolation='nearest')
+        plt.colorbar()
+        plt.title(f"Adjusted Cost Matrix M_adjusted - {prior_method} with reg={reg}")
+        plt.savefig(f"adjusted_cost_matrix_{prior_method}.png")
 
     P =  pot.sinkhorn(a, b, M_adjusted, reg=reg)
     P = clip_matrix(P)
+
+    # then show a heatmap of the final transport plan P
+    if DEBUG:
+        plt.clf()
+        plt.imshow(P, cmap='hot', interpolation='nearest')
+        plt.colorbar()
+        plt.title(f"Optimal Transport Plan P - {prior_method} with reg={reg}")
+        plt.savefig(f"optimal_transport_plan_{prior_method}.png")
+
     return P
 
 
@@ -132,6 +172,14 @@ def get_pseudotime_prior_uniform(y0, y1, threshold=0.2):
 
     # Boolean mask of admissible pairs (cell in y1 occurs after cell in y0).
     pseudotime_greater_f = (y1_t.unsqueeze(0) > y0_t.unsqueeze(1)).to(dtype=torch.float32)
+
+    # let's have pseudotime_greater_f as a heatmap
+    if DEBUG:
+        import matplotlib.pyplot as plt
+        plt.imshow(pseudotime_greater_f.cpu().numpy(), cmap='gray', interpolation='nearest')
+        plt.colorbar()
+        plt.title("Pseudotime Greater Mask")
+        plt.savefig("pseudotime_greater_mask.png")
 
     # Row-wise counts via GEMM (BLAS-backed matmul).
     ones = torch.ones((n1, 1), device=y0_t.device, dtype=torch.float32)
